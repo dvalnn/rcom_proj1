@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include "app.h"
+#include "input_parser.h"
 
 int get_address(char* hostname, char* port, struct addrinfo** result) {
     int status;
@@ -92,23 +93,29 @@ uint64_t recv_to_file(int socketfd, const char* filename) {
     return received_bytes;
 }
 
-int run(const char* url) {
+int run(char* url) {
     char username[256] = "anonymous", password[256] = "", host[256] = "",
          port[6] = "21", path[256] = "", passive_host[INET_ADDRSTRLEN],
          passive_port[6];
 
-    struct addrinfo* host_info = NULL;
+    // struct addrinfo* host_info = NULL;
+    parse_input(url, username, password, host, port, path);
+    printf("username %s\n", username);
+    printf("password %s\n", password);
+    printf("host %s\n", host);
+    printf("port %s\n", port);
+    printf("path %s\n", path);
 
-    if (get_address(host, port, &host_info)) {
-        perror("get address failed");
-        return 2;
-    }
-    print_address(host_info);
+    // if (get_address(host, port, &host_info)) {
+    //     perror("get address failed");
+    //     return 2;
+    // }
+    // print_address(host_info);
 
-    int socket = connect_to_host(host_info, port);
+    // int socket = connect_to_host(host_info, port);
 
-    freeaddrinfo(host_info);
+    // freeaddrinfo(host_info);
 
-    close(socket);
+    // close(socket);
     return 0;
 }
