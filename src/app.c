@@ -71,7 +71,20 @@ int run(char* hostname) {
 
     print_address(result);
 
-    freeaddrinfo(result);  // free the linked list
+    // create a connection socket file descriptor
+    int con_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (con_socket < 0)
+        perror("socket failed");
 
+    printf("socket descriptor number %d\n", con_socket);
+
+    // establish connection to remote server using created socket
+    int con_status = connect(con_socket, result->ai_addr, result->ai_addrlen);
+    if (con_status < 0)
+        perror("connection failed");
+
+    printf("Connected to %s\n", result->ai_canonname);
+
+    freeaddrinfo(result);  // free the linked list
     return 0;
 }
