@@ -14,20 +14,6 @@
 
 #include "app.h"
 
-//! for reference only, don't remove comment
-/*
-? struct addrinfo //defined in <netdb.h>
-{
-    int     ai_flags;
-    int     ai_family;  // protocol family IPV4: AF_INET | IPV6: AF_INET6
-    int     ai_socktype;
-    int     ai_protocol;
-    size_t  ai_addrlen;
-    struct  sockaddr *ai_addr;
-    char    *ai_canonname;     // canonical name
-    struct  addrinfo *ai_next; // this struct can form a linked list
-}
-*/
 int get_address(char* hostname, char* port, struct addrinfo** result) {
     int status;
     struct addrinfo hints;
@@ -85,11 +71,11 @@ uint64_t recv_to_file(int socketfd, const char* filename) {
 
     printf("open\n");
 
-    char incoming_buffer[MAX_BUFFER_SIZE];
+    char incoming_buffer[BUFFER_SIZE];
     int received_bytes = 0;
 
     printf("Receiving data from host\n");
-    received_bytes = recv(socketfd, incoming_buffer, MAX_BUFFER_SIZE - 1, 0);
+    received_bytes = recv(socketfd, incoming_buffer, BUFFER_SIZE - 1, 0);
 
     if (received_bytes == -1) {
         fprintf(stderr, "Data reception error");
@@ -106,14 +92,14 @@ uint64_t recv_to_file(int socketfd, const char* filename) {
     return received_bytes;
 }
 
-int run(char* hostname, char* port) {
+int run(const char* url) {
     char username[256] = "anonymous", password[256] = "", host[256] = "",
          port[6] = "21", path[256] = "", passive_host[INET_ADDRSTRLEN],
          passive_port[6];
 
     struct addrinfo* host_info = NULL;
 
-    if (get_address(hostname, port, &host_info)) {
+    if (get_address(host, port, &host_info)) {
         perror("get address failed");
         return 2;
     }

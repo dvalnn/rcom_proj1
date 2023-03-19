@@ -1,8 +1,10 @@
 #ifndef _APP_H_
 #define _APP_H_
 
-#define MAX_BUFFER_SIZE 254
+#include <stdint.h>
 
-int run(char* hostname, char* port);
+#define BUFFER_SIZE 1024
 
-#endif  // _APP_H_
+int run(const char *url);
+
+#endif // _APP_H_
