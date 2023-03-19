@@ -39,10 +39,28 @@ int get_address(char* hostname, char* port, struct addrinfo** result) {
 
     if ((status = getaddrinfo(hostname, port, &hints, result)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
-        return 2;
+        return -1;
     }
 
     return 0;
+}
+
+int connect_to_host(struct addrinfo* host, char* port) {
+    // create a connection socket file descriptor
+    int con_socket = socket(host->ai_family, host->ai_socktype, host->ai_protocol);
+    if (con_socket < 0) {
+        perror("socket failed");
+        return -1;
+    }
+
+    // establish connection to remote server using created socket
+    printf("Establishing connection to %s\n on port %s\n\n", host->ai_canonname, port);
+    int con_status = connect(con_socket, host->ai_addr, host->ai_addrlen);
+    if (con_status < 0) {
+        perror("connection failed");
+        return -1;
+    }
+    return con_socket;
 }
 
 void print_address(struct addrinfo* info) {
@@ -65,90 +83,46 @@ uint64_t recv_to_file(int socketfd, const char* filename) {
         return -1;
     }
 
+    printf("open\n");
+
     char incoming_buffer[MAX_BUFFER_SIZE];
     int received_bytes = 0;
 
     printf("Receiving data from host\n");
     received_bytes = recv(socketfd, incoming_buffer, MAX_BUFFER_SIZE - 1, 0);
+
     if (received_bytes == -1) {
         fprintf(stderr, "Data reception error");
         return -1;
     }
+
     printf("Received %d bytes: %s\n", received_bytes, incoming_buffer);
+    fflush(stdout);
     fprintf(file, "%s", incoming_buffer);
+    fflush(file);
 
     fclose(file);
+    printf("close\n");
     return received_bytes;
 }
 
-int connection_manager(int socket) {
-    fd_set readfds;
-    struct timeval tv;
-    tv.tv_sec = 10;
-    tv.tv_usec = 500000;
-    // char buf1[256];
-    // char buf2[256];
-
-    FD_ZERO(&readfds);
-
-    // add our descriptors to the set
-    FD_SET(socket, &readfds);
-    // FD_SET(s2, &readfds);
-    // since we got s2 second, it's the "greater", so we use that for
-    // the n param in select()
-    // wait until either socket has data ready to be recv()d (timeout 10.5 secs)
-
-    printf("Listening to socket %d\n", socket);
-    fflush(stdout);
-
-    while (1) {
-        int rv = select(socket + 1, &readfds, NULL, NULL, NULL);
-        if (rv == -1) {
-            perror("select");  // error occurred in select()
-            break;
-        }
-
-        // one or both of the descriptors have data
-        if (FD_ISSET(socket, &readfds)) {
-            recv_to_file(socket, "received.txt");
-        }
-        // if (FD_ISSET(s2, &readfds)) {
-        //     recv(s1, buf2, sizeof buf2, 0);
-        // }
-    }
-    return 0;
-}
-
 int run(char* hostname, char* port) {
+    char username[256] = "anonymous", password[256] = "", host[256] = "",
+         port[6] = "21", path[256] = "", passive_host[INET_ADDRSTRLEN],
+         passive_port[6];
+
     struct addrinfo* host_info = NULL;
 
     if (get_address(hostname, port, &host_info)) {
         perror("get address failed");
         return 2;
     }
-
     print_address(host_info);
 
-    // create a connection socket file descriptor
-    int con_socket = socket(host_info->ai_family, host_info->ai_socktype, host_info->ai_protocol);
-    if (con_socket < 0) {
-        perror("socket failed");
-        return 2;
-    }
+    int socket = connect_to_host(host_info, port);
 
-    // establish connection to remote server using created socket
-    printf("Establishing connection to %s\n on port %s\n\n", hostname, port);
-    int con_status = connect(con_socket, host_info->ai_addr, host_info->ai_addrlen);
-    if (con_status < 0) {
-        perror("connection failed");
-        return 2;
-    }
+    freeaddrinfo(host_info);
 
-    printf("Connection Succcessfull\n\n");
-    freeaddrinfo(host_info);  // free the linked list
-
-    connection_manager(con_socket);
-
-    close(con_socket);
+    close(socket);
     return 0;
 }
