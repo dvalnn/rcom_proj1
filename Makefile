@@ -15,9 +15,8 @@ SRC = src/
 INCLUDE = include/
 BIN = bin/
 
-HOST=rcom:rcom@netlab1.fe.up.pt
-
-FILE=files/crab.mp4
+#HOST=rcom:rcom@netlab1.fe.up.pt
+#FILE=files/crab.mp4
 
 # Targets
 .PHONY: all
@@ -26,9 +25,9 @@ all: $(BIN)/main
 $(BIN)/main: main.c $(SRC)/*.c
 	$(CC) $(CFLAGS) -o $@ $^ -I$(INCLUDE) -lrt
 
-.PHONY: run
-run: $(BIN)/main
-	./$(BIN)/main "ftp://$(HOST)/$(FILE)"
+#.PHONY: run
+#run: $(BIN)/main
+#	./$(BIN)/main "ftp://$(HOST)/$(FILE)"
 
 docs: $(BIN)/main
 	doxygen Doxyfile
