@@ -58,41 +58,76 @@ void print_address(struct addrinfo* info) {
     printf(" IPV4: %s\n", ipstr);
 }
 
-int run(char* hostname) {
-    // printf("%s\n", argv1);
-    // char* tcp_control_port = " 21";
-    // char* tcp_data_port = "20";
-    char* local_host_port = "3490";
+uint64_t recv_to_file(int socketfd, const char* filename) {
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        fprintf(stderr, "Could not open %s\n", filename);
+        return -1;
+    }
 
+    char incoming_buffer[RCV_BUFFER_SIZE];
+    int received_bytes = 0;
+    uint64_t total_received = 0;
+
+    printf("Receiving data from host\n");
+    while ((received_bytes = recv(socketfd, incoming_buffer, RCV_BUFFER_SIZE, 0)) != 0) {
+        if (received_bytes == -1) {
+            fprintf(stderr, "Data reception error at byte %ld", total_received);
+            break;
+        }
+        total_received += received_bytes;
+        fprintf(file, "%s", incoming_buffer);
+        printf("received %d bytes for a total of %ld", received_bytes, total_received);
+    }
+
+    fclose(file);
+    return total_received;
+}
+
+int run(char* hostname, char* port) {
     struct addrinfo* host_info = NULL;
 
-    if (get_address(hostname, local_host_port, &host_info))
+    if (get_address(hostname, port, &host_info)) {
         perror("get address failed");
+        return 2;
+    }
 
     print_address(host_info);
 
     // create a connection socket file descriptor
     int con_socket = socket(host_info->ai_family, host_info->ai_socktype, host_info->ai_protocol);
-    if (con_socket < 0)
+    if (con_socket < 0) {
         perror("socket failed");
-
-    printf("socket descriptor number %d\n", con_socket);
+        return 2;
+    }
 
     // establish connection to remote server using created socket
+    printf("Establishing connection to %s\n on port %s\n\n", hostname, port);
     int con_status = connect(con_socket, host_info->ai_addr, host_info->ai_addrlen);
-    if (con_status < 0)
+    if (con_status < 0) {
         perror("connection failed");
+        return 2;
+    }
 
-    printf("Connected to %s\n", host_info->ai_canonname);
+    printf("Connection Succcessfull\n\n");
     freeaddrinfo(host_info);  // free the linked list
 
-    char incoming_buffer[1024];
-    int received_bytes = 0;
+    char* buffer = "GET index.html";
+    printf("Attempting to send %ld bytes: \"%s\"\n", strlen(buffer), buffer);
 
-    received_bytes = recv(con_socket, incoming_buffer, sizeof(incoming_buffer), 0);
+    int sent = send(con_socket, buffer, strlen(buffer), 0);
+    if (sent < 0) {
+        perror("send failed");
+        return 2;
+    }
+    printf("Sent %d bytes\n", sent);
 
-    printf("Received %d bytes: %s\n", received_bytes, incoming_buffer);
+    uint64_t received = recv_to_file(con_socket, "received.html");
+    if (received > 0)
+        printf("Received %ld bytes\n", received);
 
     close(con_socket);
+    printf("Connection closed\n");
+
     return 0;
 }
