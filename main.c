@@ -1,6 +1,13 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "app.h"
 
 int main(int argc, char* argv[]) {
-    helloWorld();
-    return 0;
+    if (argc < 2) {
+        printf("Usage: %s url\n", argv[0]);
+        exit(1);
+    }
+
+    return run(argv[1]);
 }

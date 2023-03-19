@@ -1,6 +1,6 @@
 #include "app.h"
 
-int helloWorld() {
-    printf("hello world\n");
+int run(char* argv1) {
+    printf("%s\n", argv1);
     return 0;
 }
