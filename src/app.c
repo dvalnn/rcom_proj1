@@ -64,27 +64,35 @@ int run(char* hostname) {
     // char* tcp_data_port = "20";
     char* local_host_port = "3490";
 
-    struct addrinfo* result = NULL;
+    struct addrinfo* host_info = NULL;
 
-    if (get_address(hostname, local_host_port, &result))
+    if (get_address(hostname, local_host_port, &host_info))
         perror("get address failed");
 
-    print_address(result);
+    print_address(host_info);
 
     // create a connection socket file descriptor
-    int con_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    int con_socket = socket(host_info->ai_family, host_info->ai_socktype, host_info->ai_protocol);
     if (con_socket < 0)
         perror("socket failed");
 
     printf("socket descriptor number %d\n", con_socket);
 
     // establish connection to remote server using created socket
-    int con_status = connect(con_socket, result->ai_addr, result->ai_addrlen);
+    int con_status = connect(con_socket, host_info->ai_addr, host_info->ai_addrlen);
     if (con_status < 0)
         perror("connection failed");
 
-    printf("Connected to %s\n", result->ai_canonname);
+    printf("Connected to %s\n", host_info->ai_canonname);
+    freeaddrinfo(host_info);  // free the linked list
 
-    freeaddrinfo(result);  // free the linked list
+    char incoming_buffer[1024];
+    int received_bytes = 0;
+
+    received_bytes = recv(con_socket, incoming_buffer, sizeof(incoming_buffer), 0);
+
+    printf("Received %d bytes: %s\n", received_bytes, incoming_buffer);
+
+    close(con_socket);
     return 0;
 }
