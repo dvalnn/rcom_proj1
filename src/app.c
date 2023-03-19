@@ -59,29 +59,64 @@ void print_address(struct addrinfo* info) {
 }
 
 uint64_t recv_to_file(int socketfd, const char* filename) {
-    FILE* file = fopen(filename, "w");
+    FILE* file = fopen(filename, "a");
     if (!file) {
         fprintf(stderr, "Could not open %s\n", filename);
         return -1;
     }
 
-    char incoming_buffer[RCV_BUFFER_SIZE];
+    char incoming_buffer[MAX_BUFFER_SIZE];
     int received_bytes = 0;
-    uint64_t total_received = 0;
 
     printf("Receiving data from host\n");
-    while ((received_bytes = recv(socketfd, incoming_buffer, RCV_BUFFER_SIZE, 0)) != 0) {
-        if (received_bytes == -1) {
-            fprintf(stderr, "Data reception error at byte %ld", total_received);
-            break;
-        }
-        total_received += received_bytes;
-        fprintf(file, "%s", incoming_buffer);
-        printf("received %d bytes for a total of %ld", received_bytes, total_received);
+    received_bytes = recv(socketfd, incoming_buffer, MAX_BUFFER_SIZE - 1, 0);
+    if (received_bytes == -1) {
+        fprintf(stderr, "Data reception error");
+        return -1;
     }
+    printf("Received %d bytes: %s\n", received_bytes, incoming_buffer);
+    fprintf(file, "%s", incoming_buffer);
 
     fclose(file);
-    return total_received;
+    return received_bytes;
+}
+
+int connection_manager(int socket) {
+    fd_set readfds;
+    struct timeval tv;
+    tv.tv_sec = 10;
+    tv.tv_usec = 500000;
+    // char buf1[256];
+    // char buf2[256];
+
+    FD_ZERO(&readfds);
+
+    // add our descriptors to the set
+    FD_SET(socket, &readfds);
+    // FD_SET(s2, &readfds);
+    // since we got s2 second, it's the "greater", so we use that for
+    // the n param in select()
+    // wait until either socket has data ready to be recv()d (timeout 10.5 secs)
+
+    printf("Listening to socket %d\n", socket);
+    fflush(stdout);
+
+    while (1) {
+        int rv = select(socket + 1, &readfds, NULL, NULL, NULL);
+        if (rv == -1) {
+            perror("select");  // error occurred in select()
+            break;
+        }
+
+        // one or both of the descriptors have data
+        if (FD_ISSET(socket, &readfds)) {
+            recv_to_file(socket, "received.txt");
+        }
+        // if (FD_ISSET(s2, &readfds)) {
+        //     recv(s1, buf2, sizeof buf2, 0);
+        // }
+    }
+    return 0;
 }
 
 int run(char* hostname, char* port) {
@@ -112,22 +147,8 @@ int run(char* hostname, char* port) {
     printf("Connection Succcessfull\n\n");
     freeaddrinfo(host_info);  // free the linked list
 
-    char* buffer = "GET index.html";
-    printf("Attempting to send %ld bytes: \"%s\"\n", strlen(buffer), buffer);
-
-    int sent = send(con_socket, buffer, strlen(buffer), 0);
-    if (sent < 0) {
-        perror("send failed");
-        return 2;
-    }
-    printf("Sent %d bytes\n", sent);
-
-    uint64_t received = recv_to_file(con_socket, "received.html");
-    if (received > 0)
-        printf("Received %ld bytes\n", received);
+    connection_manager(con_socket);
 
     close(con_socket);
-    printf("Connection closed\n");
-
     return 0;
 }
