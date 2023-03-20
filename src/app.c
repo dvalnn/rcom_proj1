@@ -32,6 +32,19 @@ int get_address(char* hostname, char* port, struct addrinfo** result) {
     return 0;
 }
 
+void print_address(struct addrinfo* info) {
+    char ipstr[INET6_ADDRSTRLEN];
+    printf("IPv4 address for %s:\n", info->ai_canonname);
+
+    // get the pointer to the address itself
+    struct sockaddr_in* ipv4 = (struct sockaddr_in*)info->ai_addr;
+
+    // convert the IP to a string and print it:
+    void* addr = &(ipv4->sin_addr);  // inet_ntop needs a void pointer as an argument
+    inet_ntop(info->ai_family, addr, ipstr, sizeof ipstr);
+    printf(" IPV4: %s\n", ipstr);
+}
+
 int connect_to_host(struct addrinfo* host, char* port) {
     // create a connection socket file descriptor
     int con_socket = socket(host->ai_family, host->ai_socktype, host->ai_protocol);
@@ -50,17 +63,25 @@ int connect_to_host(struct addrinfo* host, char* port) {
     return con_socket;
 }
 
-void print_address(struct addrinfo* info) {
-    char ipstr[INET6_ADDRSTRLEN];
-    printf("IPv4 address for %s:\n", info->ai_canonname);
+ssize_t recv_all(int sock, char* buffer, size_t len) {
+    ssize_t bytes_read_total = 0, bytes_read = 0;
 
-    // get the pointer to the address itself
-    struct sockaddr_in* ipv4 = (struct sockaddr_in*)info->ai_addr;
+    usleep(100000);
 
-    // convert the IP to a string and print it:
-    void* addr = &(ipv4->sin_addr);  // inet_ntop needs a void pointer as an argument
-    inet_ntop(info->ai_family, addr, ipstr, sizeof ipstr);
-    printf(" IPV4: %s\n", ipstr);
+    while ((bytes_read = recv(sock, buffer + bytes_read_total,
+                              len - bytes_read_total, MSG_DONTWAIT)) > 0) {
+        bytes_read_total += bytes_read;
+        usleep(100000);
+    }
+
+    buffer[bytes_read_total] = '\0';
+    printf("Received %ld bytes: %s\n", bytes_read_total, buffer);
+
+    return bytes_read_total;
+}
+
+void ftp_login(int socket, char* username, char* password) {
+    ;
 }
 
 uint64_t recv_to_file(int socketfd, const char* filename) {
@@ -98,7 +119,6 @@ int run(char* url) {
          port[6] = "21", path[256] = "", passive_host[INET_ADDRSTRLEN],
          passive_port[6];
 
-    // struct addrinfo* host_info = NULL;
     parse_input(url, username, password, host, port, path);
     printf("username %s\n", username);
     printf("password %s\n", password);
@@ -106,16 +126,23 @@ int run(char* url) {
     printf("port %s\n", port);
     printf("path %s\n", path);
 
-    // if (get_address(host, port, &host_info)) {
-    //     perror("get address failed");
-    //     return 2;
-    // }
-    // print_address(host_info);
+    struct addrinfo* host_info;
 
-    // int socket = connect_to_host(host_info, port);
+    if (get_address(host, port, &host_info)) {
+        perror("get address failed");
+        return 2;
+    }
+    print_address(host_info);
 
-    // freeaddrinfo(host_info);
+    int socket = connect_to_host(host_info, port);
 
-    // close(socket);
+    char buf[2048];
+
+    sleep(5);
+    recv_all(socket, buf, sizeof(buf));
+
+    freeaddrinfo(host_info);
+
+    close(socket);
     return 0;
 }

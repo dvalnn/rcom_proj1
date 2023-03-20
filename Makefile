@@ -15,7 +15,8 @@ SRC = src/
 INCLUDE = include/
 BIN = bin/
 
-HOST=rcom:rcom@netlab1.fe.up.pt
+# HOST=rcom:rcom@netlab1.fe.up.pt
+HOST=localhost:9034
 FILE=files/crab.mp4
 
 # Targets
