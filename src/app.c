@@ -75,43 +75,113 @@ ssize_t recv_all(int sock, char* buffer, size_t len) {
     }
 
     buffer[bytes_read_total] = '\0';
-    printf("Received %ld bytes: %s\n", bytes_read_total, buffer);
+    printf("Received %ld bytes: %s", bytes_read_total, buffer);
 
     return bytes_read_total;
 }
 
-void ftp_login(int socket, char* username, char* password) {
-    ;
+int parse_code(int socket) {
+    char buffer[BUFFER_SIZE] = "";
+    int code = 0;
+
+    size_t received_bytes = recv_all(socket, buffer, sizeof buffer);
+    if (received_bytes < 0) {
+        return -1;
+    }
+
+    sscanf(buffer, "%d", &code);
+    printf("Received code %d\n", code);
+    return code;
 }
 
-uint64_t recv_to_file(int socketfd, const char* filename) {
-    FILE* file = fopen(filename, "a");
+ssize_t send_all(int socket, const char* buffer, size_t len) {
+    size_t total = 0;        // how many bytes we've sent
+    size_t bytesleft = len;  // how many we have left to send
+    int n;
+    while (total < len) {
+        n = send(socket, buffer + total, bytesleft, 0);
+        if (n == -1) {
+            break;
+        }
+        total += n;
+        bytesleft -= n;
+    }
+    return bytesleft;
+}
+
+int ftp_login(int socket, char* username, char* password) {
+    int code = 0;
+
+    code = parse_code(socket);
+    if (code == -1)
+        return -1;  // did not receive welcome message
+    if (code == 230) {
+        printf("login succesfull");
+        return 0;
+    }
+
+    char user_buff[BUFFER_SIZE] = "USER ";
+    strcat(user_buff, username);
+    strcat(user_buff, "\n");
+    printf("sending username: %s", user_buff);
+    size_t not_sent = send_all(socket, user_buff, strlen(user_buff));
+    if (not_sent) {
+        perror("ftp_login failed - username not sent correctly\n");
+        return -1;
+    }
+
+    code = parse_code(socket);
+    if (code == -1)
+        return -1;
+
+    char pass_buff[BUFFER_SIZE] = "PASS ";
+    strcat(pass_buff, password);
+    strcat(pass_buff, "\n");
+    printf("sending password: %s", pass_buff);
+    not_sent = send_all(socket, pass_buff, strlen(pass_buff));
+    if (not_sent) {
+        perror("ftp_login failed - password not sent correctly\n");
+        return -1;
+    }
+
+    code = parse_code(socket);
+    if (code == -1)
+        return -1;
+
+    printf("Login successful\n");
+    return 0;
+}
+
+int recv_to_file(int sock) {
+    FILE* file = fopen("files/downloaded.txt", "w");
     if (!file) {
-        fprintf(stderr, "Could not open %s\n", filename);
+        fprintf(stderr, "Could not open %s\n", "files/downloaded.hmtl");
         return -1;
     }
 
-    printf("open\n");
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_read_total = 0, bytes_read = 0;
 
-    char incoming_buffer[BUFFER_SIZE];
-    int received_bytes = 0;
+    usleep(100000);
 
-    printf("Receiving data from host\n");
-    received_bytes = recv(socketfd, incoming_buffer, BUFFER_SIZE - 1, 0);
-
-    if (received_bytes == -1) {
-        fprintf(stderr, "Data reception error");
-        return -1;
+    while ((bytes_read = recv(sock, buffer, sizeof buffer, MSG_DONTWAIT)) > 0) {
+        bytes_read_total += bytes_read;
+        fprintf(file, "%s", buffer);
+        usleep(100000);
     }
-
-    printf("Received %d bytes: %s\n", received_bytes, incoming_buffer);
-    fflush(stdout);
-    fprintf(file, "%s", incoming_buffer);
-    fflush(file);
 
     fclose(file);
     printf("close\n");
-    return received_bytes;
+    return 0;
+}
+
+void retrieve_file(int sock, char* path) {
+    char format[BUFFER_SIZE] = "retr ";
+    strcat(format, path);
+    strcat(format, "\n");
+    printf("sending %s", format);
+    send_all(sock, format, strlen(format));
+    recv_to_file(sock);
 }
 
 int run(char* url) {
@@ -136,10 +206,9 @@ int run(char* url) {
 
     int socket = connect_to_host(host_info, port);
 
-    char buf[2048];
-
-    sleep(5);
-    recv_all(socket, buf, sizeof(buf));
+    ftp_login(socket, username, password);
+    retrieve_file(socket, path);
+    // sleep(5);
 
     freeaddrinfo(host_info);
 

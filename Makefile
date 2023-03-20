@@ -15,9 +15,10 @@ SRC = src/
 INCLUDE = include/
 BIN = bin/
 
-# HOST=rcom:rcom@netlab1.fe.up.pt
-HOST=localhost:9034
-FILE=files/crab.mp4
+HOST=anonymous:pass@ftp.up.pt/
+# HOST=rcom:rcom@netlab1.fe.up.pt/
+# HOST=localhost:9034
+FILE=mirrors/ftp.gnome.org/FGO-HEADER.html
 
 # Targets
 .PHONY: all
