@@ -94,9 +94,6 @@ int parse_input(char* input, char* username, char* password, char* host, char* p
 
     // parse for file path
     sscanf(pos, "%256s", path);
-    if (bytes_read <= 0) {
-        password[0] = '\0';
-    }
 
     return 0;
 }
