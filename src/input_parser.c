@@ -81,7 +81,8 @@ int parse_input(char* input, char* username, char* password, char* host, char* p
     switch (status) {
         case 2:
             status = parse_port(&pos, port);
-            //* Intentional fall-through
+            break;
+            
         case 1:
             break;
 

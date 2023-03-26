@@ -5,6 +5,6 @@
 
 #define BUFFER_SIZE 1024
 
-int run(char* url);
+int run(char* url, char* local_file_name);
 
 #endif  // _APP_H_

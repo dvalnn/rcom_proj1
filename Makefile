@@ -17,6 +17,7 @@ BIN = bin/
 
 HOST=anonymous:pass@ftp.up.pt
 FILE=/debian/README.html
+LOCAL_FILE_NAME = files/README.html
 # HOST=rcom:rcom@netlab1.fe.up.pt/
 
 # Targets
@@ -28,7 +29,7 @@ $(BIN)/main: main.c $(SRC)/*.c
 
 .PHONY: run
 run: $(BIN)/main
-	./$(BIN)/main ftp://$(HOST)/$(FILE)
+	./$(BIN)/main ftp://$(HOST)/$(FILE) $(LOCAL_FILE_NAME)
 
 docs: $(BIN)/main
 	doxygen Doxyfile
