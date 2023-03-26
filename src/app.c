@@ -121,10 +121,11 @@ int ftp_login(int socket, char* username, char* password) {
         return 0;
     }
 
-    char user_buff[BUFFER_SIZE] = "USER ";
-    strcat(user_buff, username);
-    strcat(user_buff, "\n");
+    char user_buff[BUFFER_SIZE];
+
+    sprintf(user_buff, "USER %s\n", username);
     printf("sending username: %s", user_buff);
+
     size_t not_sent = send_all(socket, user_buff, strlen(user_buff));
     if (not_sent) {
         perror("ftp_login failed - username not sent correctly\n");
@@ -135,10 +136,11 @@ int ftp_login(int socket, char* username, char* password) {
     if (code == -1)
         return -1;
 
-    char pass_buff[BUFFER_SIZE] = "PASS ";
-    strcat(pass_buff, password);
-    strcat(pass_buff, "\n");
+    char pass_buff[BUFFER_SIZE];
+
+    sprintf(pass_buff, "PASS %s\n", password);
     printf("sending password: %s", pass_buff);
+
     not_sent = send_all(socket, pass_buff, strlen(pass_buff));
     if (not_sent) {
         perror("ftp_login failed - password not sent correctly\n");
@@ -193,10 +195,11 @@ int passive_mode(int socket, char* passive_host, char* passive_port) {
 // }
 
 void retrieve_file(int socket, char* path, char* local_path) {
-    char format[BUFFER_SIZE] = "retr ";
-    strcat(format, path);
-    strcat(format, "\n");
+    char format[BUFFER_SIZE];
+
+    sprintf(format, "retr %s\n", path);
     printf("sending %s", format);
+
     send_all(socket, format, strlen(format));
     // recv_to_file(sock);
 
