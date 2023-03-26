@@ -152,7 +152,14 @@ int ftp_login(int socket, char* username, char* password) {
     return 0;
 }
 
-int recv_to_file(int sock) {
+int passive_mode(int socket) {
+    char* buff[BUFFER_SIZE];
+    size_t not_sent = send_all(socket, "PASV", strlen("PASV"));
+    recv_all(socket, buff, BUFFER_SIZE);
+    return 0;
+}
+
+int recv_to_file(int socket) {
     FILE* file = fopen("files/downloaded.txt", "w");
     if (!file) {
         fprintf(stderr, "Could not open %s\n", "files/downloaded.hmtl");
@@ -164,7 +171,7 @@ int recv_to_file(int sock) {
 
     usleep(100000);
 
-    while ((bytes_read = recv(sock, buffer, sizeof buffer, MSG_DONTWAIT)) > 0) {
+    while ((bytes_read = recv(socket, buffer, sizeof buffer, MSG_DONTWAIT)) > 0) {
         bytes_read_total += bytes_read;
         fprintf(file, "%s", buffer);
         usleep(100000);
@@ -207,8 +214,8 @@ int run(char* url) {
     int socket = connect_to_host(host_info, port);
 
     ftp_login(socket, username, password);
-    retrieve_file(socket, path);
-    // sleep(5);
+    // retrieve_file(socket, path);
+    //  sleep(5);
 
     freeaddrinfo(host_info);
 
