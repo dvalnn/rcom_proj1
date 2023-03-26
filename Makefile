@@ -15,10 +15,9 @@ SRC = src/
 INCLUDE = include/
 BIN = bin/
 
-HOST=anonymous:pass@ftp.up.pt/
+HOST=anonymous:pass@ftp.up.pt
+FILE=/debian/README.html
 # HOST=rcom:rcom@netlab1.fe.up.pt/
-# HOST=localhost:9034
-FILE=mirrors/ftp.gnome.org/FGO-HEADER.html
 
 # Targets
 .PHONY: all

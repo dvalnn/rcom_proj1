@@ -152,15 +152,25 @@ int ftp_login(int socket, char* username, char* password) {
     return 0;
 }
 
-int passive_mode(int socket) {
-    char* buff[BUFFER_SIZE];
-    size_t not_sent = send_all(socket, "PASV", strlen("PASV"));
-    recv_all(socket, buff, BUFFER_SIZE);
+int passive_mode(int socket, char* passive_host, char* passive_port) {
+    char buffer[BUFFER_SIZE];
+    char* msg = "pasv\n";
+
+    size_t not_sent = send_all(socket, msg, strlen(msg));
+    size_t received = recv_all(socket, buffer, BUFFER_SIZE);
+
+    int buff[6];
+    sscanf(buffer, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).", &buff[0], &buff[1], &buff[2], &buff[3], &buff[4], &buff[5]);
+    sprintf(passive_host, "%d.%d.%d.%d", buff[0], buff[1], buff[2], buff[3]);
+    sprintf(passive_port, "%d", buff[4] * 256 + buff[5]);
+
+    printf("Passive Mode Data:\n\tHost - %s\n\tPort - %s\n", passive_host, passive_port);
+
     return 0;
 }
 
 int recv_to_file(int socket) {
-    FILE* file = fopen("files/downloaded.txt", "w");
+    FILE* file = fopen("files/downloaded.html", "w");
     if (!file) {
         fprintf(stderr, "Could not open %s\n", "files/downloaded.hmtl");
         return -1;
@@ -178,7 +188,6 @@ int recv_to_file(int socket) {
     }
 
     fclose(file);
-    printf("close\n");
     return 0;
 }
 
@@ -193,8 +202,8 @@ void retrieve_file(int sock, char* path) {
 
 int run(char* url) {
     char username[256] = "anonymous", password[256] = "", host[256] = "",
-         port[6] = "21", path[256] = "", passive_host[INET_ADDRSTRLEN],
-         passive_port[6];
+         port[6] = "21", path[256] = "", passive_host[INET_ADDRSTRLEN] = "",
+         passive_port[6] = "";
 
     parse_input(url, username, password, host, port, path);
     printf("username %s\n", username);
@@ -213,12 +222,24 @@ int run(char* url) {
 
     int socket = connect_to_host(host_info, port);
 
-    ftp_login(socket, username, password);
-    // retrieve_file(socket, path);
-    //  sleep(5);
-
     freeaddrinfo(host_info);
 
+    ftp_login(socket, username, password);
+    passive_mode(socket, passive_host, passive_port);
+
+
+    if (get_address(passive_host, passive_port, &host_info)) {
+        perror("get address failed");
+        return 2;
+    }
+
+    int data_socket = connect_to_host(host_info, passive_port);
+    freeaddrinfo(host_info);
+
+    retrieve_file(data_socket, path);
+
     close(socket);
+    close(data_socket);
+
     return 0;
 }
