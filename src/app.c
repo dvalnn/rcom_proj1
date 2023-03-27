@@ -172,45 +172,56 @@ int passive_mode(int socket, char* passive_host, char* passive_port) {
     return 0;
 }
 
-// int recv_to_file(int socket) {
-//     FILE* file = fopen("files/downloaded.html", "w");
-//     if (!file) {
-//         fprintf(stderr, "Could not open %s\n", "files/downloaded.hmtl");
-//         return -1;
-//     }
+int recv_to_file(int socket, char* path, char* local_path) {
+    FILE* file = fopen(local_path, "wb");
+    if (!file) {
+        fprintf(stderr, "Could not open %s\n", local_path);
+        return -1;
+    }
 
-//     char buffer[BUFFER_SIZE];
-//     ssize_t bytes_read_total = 0, bytes_read = 0;
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_read_total = 0, bytes_read = 0;
 
-//     usleep(100000);
+    usleep(100000);
 
-//     while ((bytes_read = recv(socket, buffer, sizeof buffer, MSG_DONTWAIT)) > 0) {
-//         bytes_read_total += bytes_read;
-//         fprintf(file, "%s", buffer);
-//         usleep(100000);
-//     }
+    while ((bytes_read = recv(socket, buffer, sizeof buffer, MSG_DONTWAIT)) > 0) {
+        bytes_read_total += bytes_read;
+        fprintf(file, "%s", buffer);
+        usleep(100000);
+    }
 
-//     fclose(file);
-//     return 0;
-// }
+    fclose(file);
+    return 0;
+}
 
 void retrieve_file(int socket, char* path, char* local_path) {
     char format[BUFFER_SIZE];
 
     sprintf(format, "retr %s\n", path);
     printf("sending %s", format);
-
     send_all(socket, format, strlen(format));
-    // recv_to_file(sock);
+    // recv_to_file(socket, path, local_path);
 
-    int out_fd = creat(local_path, 0744);
+    int out_fd = open(local_path, O_CREAT, 0744);
     uint8_t buf[BUFFER_SIZE];
     ssize_t bytes_read;
 
-    while ((bytes_read = recv(socket, buf, BUFFER_SIZE, 0)) > 0) {
+    if (!out_fd) {
+        printf("Could not open %s\n", local_path);
+        return;
+    }
+
+    printf("Starting file write\n");
+    do {
+        bytes_read = read(socket, buf, BUFFER_SIZE);
         ssize_t bytes_written = write(out_fd, buf, bytes_read);
         printf("Written %lu bytes to file", bytes_written);
-    }
+    } while (bytes_read);
+
+    // while ((bytes_read = read(socket, buf, BUFFER_SIZE)) > 0) {
+    //     ssize_t bytes_written = write(out_fd, buf, bytes_read);
+    //     printf("Written %lu bytes to file", bytes_written);
+    // }
 
     close(out_fd);
 }
