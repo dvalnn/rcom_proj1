@@ -1,6 +1,8 @@
 #define _POSIX_SOURCE 1
 #define _GNU_SOURCE
 
+#include "app.h"
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -13,8 +15,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "app.h"
 #include "input_parser.h"
+
+unsigned long file_size = 0L;
+unsigned long current_progress = 0L;
 
 int get_address(char* hostname, char* port, struct addrinfo** result) {
     int status;
@@ -81,37 +85,28 @@ ssize_t recv_all(int sock, char* buffer, size_t len) {
     return bytes_read_total;
 }
 
-int parse_code(int socket) {
-    char buffer[BUFFER_SIZE] = "";
-    int code = 0;
+int parse_code(int fd) {
+    char buff[BUFFER_SIZE] = "";
+    int code = -1;
 
-    size_t received_bytes = recv_all(socket, buffer, sizeof buffer);
-    if (received_bytes < 0) {
+    if (recv_all(fd, buff, BUFFER_SIZE) < 0)
         return -1;
+
+    sscanf(buff, "%d", &code);
+
+    int n = 0;
+    unsigned long temp;
+    if (sscanf(buff, " %*[^(](%lu bytes)%n", &temp, &n) && n > 0) {
+        file_size = temp;
+        printf("File size: %lu bytes\n", file_size);
     }
 
-    sscanf(buffer, "%d", &code);
-    printf("Received code %d\n", code);
     return code;
-}
-
-ssize_t send_all(int socket, const char* buffer, size_t len) {
-    size_t total = 0;        // how many bytes we've sent
-    size_t bytesleft = len;  // how many we have left to send
-    int n;
-    while (total < len) {
-        n = send(socket, buffer + total, bytesleft, 0);
-        if (n == -1) {
-            break;
-        }
-        total += n;
-        bytesleft -= n;
-    }
-    return bytesleft;
 }
 
 int ftp_login(int socket, char* username, char* password) {
     int code = 0;
+    int len;
 
     code = parse_code(socket);
     if (code == -1)
@@ -123,11 +118,11 @@ int ftp_login(int socket, char* username, char* password) {
 
     char user_buff[BUFFER_SIZE];
 
-    sprintf(user_buff, "USER %s\n", username);
+    sprintf(user_buff, "USER %s\n%n", username, &len);
     printf("sending username: %s", user_buff);
 
-    size_t not_sent = send_all(socket, user_buff, strlen(user_buff));
-    if (not_sent) {
+    size_t sent = send(socket, user_buff, len, 0);
+    if (!sent) {
         perror("ftp_login failed - username not sent correctly\n");
         return -1;
     }
@@ -138,11 +133,11 @@ int ftp_login(int socket, char* username, char* password) {
 
     char pass_buff[BUFFER_SIZE];
 
-    sprintf(pass_buff, "PASS %s\n", password);
+    sprintf(pass_buff, "PASS %s\n%n", password, &len);
     printf("sending password: %s", pass_buff);
 
-    not_sent = send_all(socket, pass_buff, strlen(pass_buff));
-    if (not_sent) {
+    sent = send(socket, pass_buff, len, 0);
+    if (!sent) {
         perror("ftp_login failed - password not sent correctly\n");
         return -1;
     }
@@ -159,8 +154,8 @@ int passive_mode(int socket, char* passive_host, char* passive_port) {
     char buffer[BUFFER_SIZE];
     char* msg = "pasv\n";
 
-    size_t not_sent = send_all(socket, msg, strlen(msg));
-    size_t received = recv_all(socket, buffer, BUFFER_SIZE);
+    send(socket, msg, strlen(msg), 0);
+    recv_all(socket, buffer, BUFFER_SIZE);
 
     int buff[6];
     sscanf(buffer, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).", &buff[0], &buff[1], &buff[2], &buff[3], &buff[4], &buff[5]);
@@ -172,58 +167,127 @@ int passive_mode(int socket, char* passive_host, char* passive_port) {
     return 0;
 }
 
-int recv_to_file(int socket, char* path, char* local_path) {
-    FILE* file = fopen(local_path, "wb");
-    if (!file) {
-        fprintf(stderr, "Could not open %s\n", local_path);
-        return -1;
-    }
-
-    char buffer[BUFFER_SIZE];
+ssize_t recvall(int fd, char* buff, size_t len) {
     ssize_t bytes_read_total = 0, bytes_read = 0;
 
     usleep(100000);
 
-    while ((bytes_read = recv(socket, buffer, sizeof buffer, MSG_DONTWAIT)) > 0) {
+    while ((bytes_read = recv(fd, buff + bytes_read_total,
+                              len - bytes_read_total, MSG_DONTWAIT)) > 0) {
         bytes_read_total += bytes_read;
-        fprintf(file, "%s", buffer);
         usleep(100000);
     }
 
-    fclose(file);
+    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+        printf("%s\n", strerror(errno));
+        return -1;
+    }
+
+    buff[bytes_read_total] = '\0';
+    if (bytes_read_total > 0)
+        printf("%s", buff);
+
+    return bytes_read_total;
+}
+
+// void retrieve_file(int socket, char* path, char* local_path) {
+//     char format[BUFFER_SIZE];
+//     int len;
+
+//     snprintf(format, "retr %s\n%n", path, &len);
+
+//     int sent = send(socket, format, len, 0);
+//     if (sent < 0) {
+//         printf("Error sending command: %s\n", strerror(errno));
+//         return;
+//     }
+
+//     printf("sent %s", format);
+
+//     int code = parse_code(socket);
+//     if (code < 0) return;
+
+//     ssize_t bytes_read;
+//     uint8_t buff[BUFFER_SIZE];
+
+//     int out_fd = open(local_path, O_CREAT, 0744);
+//     if (!out_fd) {
+//         printf("Could not open %s\n", local_path);
+//         return;
+//     }
+
+//     printf("Starting transfer\n");
+//     while ((bytes_read = recv(socket, buff, BUFFER_SIZE, 0)) > 0) {
+//         printf("hello\n");
+//         ssize_t bytes_written = write(out_fd, buff, bytes_read);
+//         printf("Written %lu bytes to file", bytes_written);
+//     }
+
+//     close(out_fd);
+// }
+
+int get_code(int fd) {
+    char buf[2048] = "";
+    int code = -1;
+
+    if (recvall(fd, buf, 2048) < 0)
+        return -1;
+
+    sscanf(buf, "%d", &code);
+
+    int n = 0;
+    unsigned long temp;
+    if (sscanf(buf, " %*[^(](%lu bytes)%n", &temp, &n) && n > 0) {
+        file_size = temp;
+        printf("File size: %lu bytes\n", file_size);
+    }
+
+    return code;
+}
+
+int start_transfer(int fd, const char* path) {
+    char buf[512];
+    int len;
+
+    snprintf(buf, sizeof buf, "retr %s\n%n", path, &len);
+    if (send(fd, buf, len, 0) < 0) {
+        printf("Error sending 'retr' command: %s\n", strerror(errno));
+        return -1;
+    }
+
+    int code = get_code(fd);
+
+    printf("%s",code);
+    if (code != 150 && code != 226) {
+        printf("Could not retrieve file\n");
+        return -1;
+    }
+
+    printf("Retrieving file\n");
     return 0;
 }
 
 void retrieve_file(int socket, char* path, char* local_path) {
-    char format[BUFFER_SIZE];
+    if (start_transfer(socket, path) < 0) return;
 
-    sprintf(format, "retr %s\n", path);
-    printf("sending %s", format);
-    send_all(socket, format, strlen(format));
-    // recv_to_file(socket, path, local_path);
-
-    int out_fd = open(local_path, O_CREAT, 0744);
+    int out_fd = creat(local_path, 0744);
     uint8_t buf[BUFFER_SIZE];
     ssize_t bytes_read;
 
-    if (!out_fd) {
-        printf("Could not open %s\n", local_path);
-        return;
+    while ((bytes_read = recv(socket, buf, BUFFER_SIZE, 0)) > 0) {
+        ssize_t bytes_written = write(out_fd, buf, bytes_read);
+
+        current_progress += bytes_written;
+
+        printf("Written %lu bytes (%lf%%) to file\n", bytes_written, (double)(current_progress * 100.0 / file_size));
+        printf("%.*s\n", (int)bytes_read, buf);
     }
 
-    printf("Starting file write\n");
-    do {
-        bytes_read = read(socket, buf, BUFFER_SIZE);
-        ssize_t bytes_written = write(out_fd, buf, bytes_read);
-        printf("Written %lu bytes to file", bytes_written);
-    } while (bytes_read);
-
-    // while ((bytes_read = read(socket, buf, BUFFER_SIZE)) > 0) {
-    //     ssize_t bytes_written = write(out_fd, buf, bytes_read);
-    //     printf("Written %lu bytes to file", bytes_written);
-    // }
-
     close(out_fd);
+
+    printf("Transfer complete\n");
+
+    return;
 }
 
 int run(char* url, char* local_file_name) {
