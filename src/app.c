@@ -1,3 +1,13 @@
+/**
+ * @file app.c
+ * @author Lucas Freitas e Tiago Amorim
+ * @brief
+ * @version 1
+ * @date 2023-03-29
+ *
+ * Inspirado na resolução https://github.com/ttoino/feup-rc-proj2
+ *
+ */
 #define _POSIX_SOURCE 1
 #define _GNU_SOURCE
 
@@ -258,6 +268,12 @@ int run(char* url, char* local_file_name) {
          passive_port[6] = "";
 
     parse_input(url, username, password, host, port, path);
+
+    if (username[0] == '\0')
+        strcpy(username, "anonymous");
+    if (port[0] == '\0')
+        strcpy(port, "21");
+
     printf("username %s\n", username);
     printf("password %s\n", password);
     printf("host %s\n", host);
