@@ -190,42 +190,6 @@ ssize_t recvall(int fd, char* buff, size_t len) {
     return bytes_read_total;
 }
 
-// void retrieve_file(int socket, char* path, char* local_path) {
-//     char format[BUFFER_SIZE];
-//     int len;
-
-//     snprintf(format, "retr %s\n%n", path, &len);
-
-//     int sent = send(socket, format, len, 0);
-//     if (sent < 0) {
-//         printf("Error sending command: %s\n", strerror(errno));
-//         return;
-//     }
-
-//     printf("sent %s", format);
-
-//     int code = parse_code(socket);
-//     if (code < 0) return;
-
-//     ssize_t bytes_read;
-//     uint8_t buff[BUFFER_SIZE];
-
-//     int out_fd = open(local_path, O_CREAT, 0744);
-//     if (!out_fd) {
-//         printf("Could not open %s\n", local_path);
-//         return;
-//     }
-
-//     printf("Starting transfer\n");
-//     while ((bytes_read = recv(socket, buff, BUFFER_SIZE, 0)) > 0) {
-//         printf("hello\n");
-//         ssize_t bytes_written = write(out_fd, buff, bytes_read);
-//         printf("Written %lu bytes to file", bytes_written);
-//     }
-
-//     close(out_fd);
-// }
-
 int get_code(int fd) {
     char buf[2048] = "";
     int code = -1;
@@ -234,60 +198,47 @@ int get_code(int fd) {
         return -1;
 
     sscanf(buf, "%d", &code);
-
-    int n = 0;
-    unsigned long temp;
-    if (sscanf(buf, " %*[^(](%lu bytes)%n", &temp, &n) && n > 0) {
-        file_size = temp;
-        printf("File size: %lu bytes\n", file_size);
-    }
-
     return code;
 }
 
-int start_transfer(int fd, const char* path) {
-    char buf[512];
+void retrieve_file(int control_fd, int data_fd, char* path, char* local_path) {
+    char format[BUFFER_SIZE];
     int len;
 
-    snprintf(buf, sizeof buf, "retr %s\n%n", path, &len);
-    if (send(fd, buf, len, 0) < 0) {
-        printf("Error sending 'retr' command: %s\n", strerror(errno));
-        return -1;
+    snprintf(format, sizeof format, "retr %s\n%n", path, &len);
+
+    int sent = send(control_fd, format, len, 0);
+    if (sent < 0) {
+        printf("Error sending command: %s\n", strerror(errno));
+        return;
     }
 
-    int code = get_code(fd);
+    printf("sent %s", format);
 
-    printf("%s",code);
+    int code = parse_code(control_fd);
     if (code != 150 && code != 226) {
         printf("Could not retrieve file\n");
-        return -1;
+        return;
     }
 
-    printf("Retrieving file\n");
-    return 0;
-}
-
-void retrieve_file(int socket, char* path, char* local_path) {
-    if (start_transfer(socket, path) < 0) return;
-
-    int out_fd = creat(local_path, 0744);
-    uint8_t buf[BUFFER_SIZE];
     ssize_t bytes_read;
+    uint8_t buff[BUFFER_SIZE];
 
-    while ((bytes_read = recv(socket, buf, BUFFER_SIZE, 0)) > 0) {
-        ssize_t bytes_written = write(out_fd, buf, bytes_read);
-
-        current_progress += bytes_written;
-
-        printf("Written %lu bytes (%lf%%) to file\n", bytes_written, (double)(current_progress * 100.0 / file_size));
-        printf("%.*s\n", (int)bytes_read, buf);
+    int out_fd = open(local_path, O_CREAT, 0744);
+    if (!out_fd) {
+        printf("Could not open %s\n", local_path);
+        return;
     }
 
+    size_t total_bytes = 0;
+    printf("Starting transfer\n");
+    while ((bytes_read = recv(data_fd, buff, BUFFER_SIZE, 0)) > 0) {
+        ssize_t bytes_written = write(out_fd, buff, bytes_read);
+        total_bytes += bytes_written;
+    }
+
+    printf("Transfer complete\n Total file size: %zu bytes\n", total_bytes);
     close(out_fd);
-
-    printf("Transfer complete\n");
-
-    return;
 }
 
 int run(char* url, char* local_file_name) {
@@ -310,25 +261,25 @@ int run(char* url, char* local_file_name) {
     }
     print_address(host_info);
 
-    int socket = connect_to_host(host_info, port);
+    int control_fd = connect_to_host(host_info, port);
 
     freeaddrinfo(host_info);
 
-    ftp_login(socket, username, password);
-    passive_mode(socket, passive_host, passive_port);
+    ftp_login(control_fd, username, password);
+    passive_mode(control_fd, passive_host, passive_port);
 
     if (get_address(passive_host, passive_port, &host_info)) {
         perror("get address failed");
         return 2;
     }
 
-    int data_socket = connect_to_host(host_info, passive_port);
+    int data_fd = connect_to_host(host_info, passive_port);
     freeaddrinfo(host_info);
 
-    retrieve_file(data_socket, path, local_file_name);
+    retrieve_file(control_fd, data_fd, path, local_file_name);
 
-    close(socket);
-    close(data_socket);
+    close(data_fd);
+    close(control_fd);
 
     return 0;
 }

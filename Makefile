@@ -15,11 +15,10 @@ SRC = src/
 INCLUDE = include/
 BIN = bin/
 
-HOST=anonymous:pass@ftp.up.pt
-FILE=/debian/README.html
-LOCAL_FILE_NAME = files/README.html
-#HOST=rcom:rcom@netlab1.fe.up.pt/
-#FILE=files/README.html
+FILE=/files/crab.mp4
+HOST=rcom:rcom@netlab1.fe.up.pt
+LOCAL_FILE_NAME = files/crab.mp4
+
 # Targets
 .PHONY: all
 all: $(BIN)/main
