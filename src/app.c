@@ -232,7 +232,7 @@ void retrieve_file(int control_fd, int data_fd, char* path, char* local_path) {
     ssize_t bytes_read;
     uint8_t buff[BUFFER_SIZE];
 
-    int out_fd = open(local_path, O_CREAT, 0744);
+    int out_fd = creat(local_path, 0744);
     if (!out_fd) {
         printf("Could not open %s\n", local_path);
         return;
