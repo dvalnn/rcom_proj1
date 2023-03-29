@@ -198,6 +198,14 @@ int get_code(int fd) {
         return -1;
 
     sscanf(buf, "%d", &code);
+
+    int n = 0;
+    unsigned long temp;
+    if (sscanf(buf, " %*[^(](%lu bytes)%n", &temp, &n) && n > 0) {
+        file_size = temp;
+        printf("File size: %lu bytes\n", file_size);
+    }
+
     return code;
 }
 
@@ -230,14 +238,17 @@ void retrieve_file(int control_fd, int data_fd, char* path, char* local_path) {
         return;
     }
 
-    size_t total_bytes = 0;
     printf("Starting transfer\n");
     while ((bytes_read = recv(data_fd, buff, BUFFER_SIZE, 0)) > 0) {
         ssize_t bytes_written = write(out_fd, buff, bytes_read);
-        total_bytes += bytes_written;
+        if (!bytes_written) {
+            printf("Error writing to %s\n", local_path);
+            break;
+        }
     }
 
-    printf("Transfer complete\n Total file size: %zu bytes\n", total_bytes);
+    printf("Transfer complete\n");
+    printf("Written to %s\n", local_path);
     close(out_fd);
 }
 
